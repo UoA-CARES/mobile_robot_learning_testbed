@@ -38,6 +38,7 @@ class Detector():
 		self.action = Twist()
 		self.num_of_markers = 0
 		self.key_pressed = False
+		self.prev_key_pressed = False
 		self.count = 0
 
 		#store previous iteration values
@@ -53,15 +54,15 @@ class Detector():
 		#file = open("/home/aakaash/fsae/src/fsae_control/data.txt","w")
 		#file.close()
 
-		r = rospy.Rate(10)
+		r = rospy.Rate(20)
 		
 		self.OpenFile()
 
 		# As long as you haven't ctrl + c keeping doing...
 		while not rospy.is_shutdown():
 			self.GetCurrentData()
-			self.AppendDataToFile()
-			#self.CalculateReward()
+			#self.AppendDataToFile()
+			print(self.CalculateReward())
 			r.sleep()
 
 
@@ -134,25 +135,26 @@ class Detector():
 
 	def CalculateReward(self):
 		self.FindLowestPair()
-
 		if(self.first_marker_index < 0):
-			return -10 * REWARD_SCALAR
-
+			return 0
+		
 		midpoint = self.CalculateMidPoint(self.markers.marker_poses[self.first_marker_index],self.markers.marker_poses[self.first_marker_index + 1])
 		angleToTarget = self.CalculateAngleTo(midpoint)
-		distanceToTarget = self.CalculateDistanceTo(midpoint)
+		#distanceToTarget = self.CalculateDistanceTo(midpoint)
 		angle_reward = REWARD_SCALAR*math.cos(angleToTarget * ANGLE_REWARD_DROPOFF)
-		
+
+		if angle_reward < 0:
+			angle_reward = 0
 		# distance_reward = REWARD_SCALAR* math.cos(distanceToTarget * DISTANCE_REWARD_DROPOFF) dropoff = 1.5 (cos - gives negative values)
 		# distance_reward = REWARD_SCALAR* math.exp(distanceToTarget * DISTANCE_REWARD_DROPOFF) dropoff = -0.5 (exp - decent performance)
-		distance_reward = REWARD_SCALAR*1.5 - (distanceToTarget * DISTANCE_REWARD_DROPOFF) #dropoff = 2 (linear)
+		#distance_reward = REWARD_SCALAR*1.5 - (distanceToTarget * DISTANCE_REWARD_DROPOFF) #dropoff = 2 (linear)
 		
 		# dont let distance reward go negative	
-		if distance_reward < 0:
-			distance_reward = 0	
+		#if distance_reward < 0:
+		#	distance_reward = 0	
 		
-		return (ANGLE_TO_DISTANCE_REWARD_PRIORITY*angle_reward) + ((1 - ANGLE_TO_DISTANCE_REWARD_PRIORITY)*distance_reward)
-		
+		#return (ANGLE_TO_DISTANCE_REWARD_PRIORITY*angle_reward) + ((1 - ANGLE_TO_DISTANCE_REWARD_PRIORITY)*distance_reward)
+		return angle_reward
 		#print ("distance = " + str(distance_reward))
 		#print ("angle = " + str(angle_reward))
 		#print ("total = " + str((ANGLE_TO_DISTANCE_REWARD_PRIORITY*angle_reward) + ((1 - ANGLE_TO_DISTANCE_REWARD_PRIORITY)*distance_reward)) + "\n")
@@ -160,7 +162,7 @@ class Detector():
 
 	def AppendDataToFile(self):
 		#print only if teleop keys pressed
-		if(self.key_pressed and self.count > 5):
+		if(self.key_pressed and self.prev_key_pressed and self.count > 5):
 			data_line = ""
 			#write marker x,z values
 			for i in range(6):
@@ -168,20 +170,23 @@ class Detector():
 			#write teleop cmd values
 			data_line += str(self.prev_action.linear.x) + " " + str(self.prev_action.angular.z) + " "
 			#write reward
-			data_line += str(self.current_reward) + "\n"
+			data_line += str(self.prev_reward) + "\n"
 			#print(str(self.current_reward) + "\n")
-			
 			#data_line += str(self.current_reward - self.prev_reward) + "\n"
 			#print(str(self.current_reward - self.prev_reward) + "\n")
 			#write data to file	
 			#print(data_line + "\n")
 			self.AppendToFile(data_line)
-		
+		elif(not self.key_pressed and self.prev_key_pressed):
+			self.CloseFile()
+		elif(self.key_pressed and not self.prev_key_pressed):
+			self.OpenFile()
 		self.count+=1
 
 		self.prev_action = self.current_action
 		self.prev_marker_positions = self.current_marker_positions
 		self.prev_reward = self.current_reward
+		self.prev_key_pressed = self.key_pressed
 		
 
 	def OpenFile(self):
@@ -219,7 +224,7 @@ class Detector():
 		
 
 	
-	def PrintAllMarkers(self, markerPositions):
+	def PrintAllMarkers(self):
 		print("Number of Markers = %d" % self.num_of_markers)
 		for i in range(self.num_of_markers):
 			print("Marker %d : \nX = %.3f \nY = %.3f \nZ = %.3f \n\n\n" % (self.markers.marker_ids[i],self.markers.marker_poses[i].position.x,self.markers.marker_poses[i].position.y,self.markers.marker_poses[i].position.z))
