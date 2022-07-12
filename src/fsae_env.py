@@ -143,7 +143,6 @@ class FSAE_Env():
             if self.no_marker_count > 10:
                 done = True
 
-        print(self.current_reward)
         # if self.bumped:
         #     done = True
         #     self.current_reward += 1000

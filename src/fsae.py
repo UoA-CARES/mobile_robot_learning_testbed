@@ -138,8 +138,8 @@ class DQN_Solver:
         return self.exploration_rate
 
 agent = DQN_Solver()
-agent.network.load_state_dict(torch.load("/home/aakaash/models/moving_cartpole_dqn_1000.pth"))
-agent.network.eval()
+#agent.network.load_state_dict(torch.load("/home/aakaash/models/moving_cartpole_dqn_1000.pth"))
+#agent.network.eval()
 
 for episode in range(1, EPISODES+1):
     state = env.reset()
@@ -176,11 +176,11 @@ for episode in range(1, EPISODES+1):
                 plt.title("DQN %s episodes" % str(episode))
                 plt.savefig("../../../../plots/moving_cartpole_dqn_{}_episodes.png".format(episode))
 
-                torch.save(agent.network.state_dict(),"/home/aakaash/models/moving_cartpole_dqn_{}.pth".format(episode))
+                torch.save(agent.network.state_dict(),"../../../../models/moving_cartpole_dqn_{}.pth".format(episode))
             
             if episode % PATH_POS_FREQ == 0:
                 # write robot position path for each episode
-                file_object = open("/home/aakaash/plots/data.txt", "a")
+                file_object = open("../../../../plots/data.txt", "a")
                 for pos in range(len(robot_x)):
                     file_object.write(str(robot_x[pos]) + " " + str(robot_y[pos]) + "\n")
                 file_object.write("End Episode {}\n".format(episode))
