@@ -14,13 +14,16 @@ env = fsae_env.FSAE_Env()
 observation_space = env.observation_space.shape[0]
 action_space = env.action_space.n
 
+PLOT_FREQ = 100
+PATH_POS_FREQ = 10
+
 EPISODES = 1000
 STEPS = 500
 LEARNING_RATE = 0.0001
 MEM_SIZE = 10000
 BATCH_SIZE = 64
 GAMMA = 0.95
-EXPLORATION_MAX = 1.0
+EXPLORATION_MAX = 0.001#1.0
 EXPLORATION_DECAY = 0.999
 EXPLORATION_MIN = 0.001
 
@@ -135,34 +138,57 @@ class DQN_Solver:
         return self.exploration_rate
 
 agent = DQN_Solver()
+agent.network.load_state_dict(torch.load("/home/aakaash/models/moving_cartpole_dqn_1000.pth"))
+agent.network.eval()
 
-for episode in range(1, EPISODES):
+for episode in range(1, EPISODES+1):
     state = env.reset()
+    robot_x = []
+    robot_y = []
+
+    robot_x.append(-1.5)
+    robot_y.append(0.0)
+
     state = np.reshape(state, [1, observation_space])
     score = 0
 
     for step in range(1, STEPS):
         #env.render()
         action = agent.choose_action(state)
-        state_, reward, done = env.step(action)
+        state_, reward, done, x, y,  = env.step(action) 
         state_ = np.reshape(state_, [1, observation_space])
         agent.memory.add(state, action, reward, state_, done)
         agent.learn()
         state = state_
         score += reward
 
-        
-        
+        robot_x.append(x)
+        robot_y.append(y)
 
         if done or step == STEPS - 1:
             if score > best_reward:
                 best_reward = score
             average_reward += score 
             print("Episode {} Average Reward {} Best Reward {} Last Reward {} Epsilon {}".format(episode, average_reward/episode, best_reward, score, agent.returning_epsilon()))
+
+            if episode % PLOT_FREQ == 0:
+                plt.plot(episode_number, average_reward_number)
+                plt.title("DQN %s episodes" % str(episode))
+                plt.savefig("../../../../plots/moving_cartpole_dqn_{}_episodes.png".format(episode))
+
+                torch.save(agent.network.state_dict(),"/home/aakaash/models/moving_cartpole_dqn_{}.pth".format(episode))
+            
+            if episode % PATH_POS_FREQ == 0:
+                # write robot position path for each episode
+                file_object = open("/home/aakaash/plots/data.txt", "a")
+                for pos in range(len(robot_x)):
+                    file_object.write(str(robot_x[pos]) + " " + str(robot_y[pos]) + "\n")
+                file_object.write("End Episode {}\n".format(episode))
+                file_object.close()
+
             break
             
         episode_number.append(episode)
         average_reward_number.append(average_reward/episode)
 
-plt.plot(episode_number, average_reward_number)
-plt.show()
+#torch.save(agent.network.state_dict(),"/home/aakaash/models/dqn_cartpole_moving.pth")

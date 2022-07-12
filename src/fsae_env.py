@@ -1,14 +1,15 @@
 
 import numpy as np
+from torch import true_divide
 import rospy
 import math
-from std_srvs.srv import Empty
 from gym import spaces
 from std_msgs.msg import Bool
 from geometry_msgs.msg import Point, Twist
 from cares_msgs.msg import ArucoMarkers
 from gazebo_msgs.msg import ModelState 
-from gazebo_msgs.srv import SetModelState
+from gazebo_msgs.srv import SetModelState, GetModelState
+#from kobuki_msgs.msg import BumperEvent
 
 ACTION_RATE = 5 # number of actions/sec
 
@@ -33,7 +34,8 @@ class FSAE_Env():
         #observation shape = (12,)
         self.observation_space = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
         self.action_space = spaces.Discrete(2)
-        
+        #self.bumped = False
+
         # Tell user how to stop TurtleBot
         rospy.loginfo("To stop TurtleBot CTRL + C")
 
@@ -42,6 +44,8 @@ class FSAE_Env():
         
         self.detector_sub = rospy.Subscriber("/camera/markers", ArucoMarkers, self.MarkerCallback)
         self.cmd_vel = rospy.Publisher("/cmd_vel_mux/input/teleop", Twist, queue_size=10)
+        #self.bump_sub = rospy.Subscriber("/mobile_base/events/bumper", BumperEvent, self.BumperCallback)
+
 
         self.markers = ArucoMarkers()
         self.action = Twist()
@@ -52,6 +56,8 @@ class FSAE_Env():
         self.current_reward = 0	
 
         self.no_marker_count = 0
+        self.finish_line_detected = False
+        self.state_updated = False
 
         self.r = rospy.Rate(ACTION_RATE)
 
@@ -66,7 +72,6 @@ class FSAE_Env():
     def shutdown(self):
         # Stop turtlebot
         rospy.loginfo("Stop TurtleBot")
-        self.CloseFile()
         # Sleep just makes sure TurtleBot receives the stop command
         # prior to shutting
         # down the script
@@ -75,21 +80,23 @@ class FSAE_Env():
     def MarkerCallback(self, data):
         self.markers = data
         self.num_of_markers = len(self.markers.marker_ids)
+        self.state_updated = True
 
-    def PrintAllMarkers(self):
-        print("Number of Markers = %d" % self.num_of_markers)
-        for i in range(self.num_of_markers):
-            print("Marker %d : \nX = %.3f \nY = %.3f \nZ = %.3f \n\n\n" % (self.markers.marker_ids[i],self.markers.marker_poses[i].position.x,self.markers.marker_poses[i].position.y,self.markers.marker_poses[i].position.z))
-
+    # def BumperCallback(self, data):
+    #     if (data.state == BumperEvent.PRESSED and not self.bumped):
+    #         self.bumped = True
 
     def reset(self):
         self.no_marker_count = 0
+        self.finish_line_detected = False
+        self.state_updated = False
 
+        #self.bumped = False
         #RESET COORDS FOR TURTLEBOT
         state_msg = ModelState()
         state_msg.model_name = 'mobile_base'
-        state_msg.pose.position.x = -1.5
-        state_msg.pose.position.y = 0
+        state_msg.pose.position.x = -1.5 #-1.5
+        state_msg.pose.position.y = 0.0
         state_msg.pose.position.z = 0.0
         state_msg.pose.orientation.x = 0
         state_msg.pose.orientation.y = 0
@@ -100,58 +107,60 @@ class FSAE_Env():
         set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
         resp = set_state(state_msg)
 
+        while not self.state_updated:
+            pass
+
         self.GetCurrentState() #get new state and store in self.current_state variable
         return self.current_state
+
+    def GetRobotPosition(self):
+        rospy.wait_for_service('/gazebo/get_model_state')
+        gms = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
+        resp1 = gms("mobile_base","map")
+        x = round(resp1.pose.position.x,2)
+        y = round(resp1.pose.position.y,2)
+        return x, y
 
 
     def step(self, action):
         move_cmd = Twist()
         done = False
 
-
         prev_state = self.current_state #store prev state in variable
         action_taken = self.action # store previous action in variable
         self.GetCurrentState() #get new state and store in self.current_state variable
         self.action = action #store current action taken in self.action variable
-        self.current_reward = self.CalculateReward() #get reward for current state
+        self.current_reward = self.CalculateCrossReward() #get reward for current state
+
+
+        
+        if self.finish_line_detected == True:
+                done = True
+                self.current_reward += 1000
 
         if self.current_reward == 0:
             self.no_marker_count += 1
             if self.no_marker_count > 10:
                 done = True
 
+        print(self.current_reward)
+        # if self.bumped:
+        #     done = True
+        #     self.current_reward += 1000
+
         if not done:
             if action == 0:
-                move_cmd.angular.z = 1
+                move_cmd.angular.z = 0.1
             else:
-                move_cmd.angular.z = -1
+                move_cmd.angular.z = -0.1
 
-
+        #constant forward velocity
+        move_cmd.linear.x = 0.5
         self.cmd_vel.publish(move_cmd)
         self.r.sleep()
-        return self.current_state, self.current_reward, done
+        x , y = self.GetRobotPosition()
 
-
-    def GetCurrentData(self):
-        saved_markers = 0
-        marker_info = []
-        for i in range(self.num_of_markers):
-            if saved_markers < 6:
-                marker_pos = ArucoPositionInfo()
-                marker_pos.id = self.markers.marker_ids[i]
-                marker_pos.x = self.markers.marker_poses[i].position.x
-                marker_pos.z = self.markers.marker_poses[i].position.z
-                marker_info.append(marker_pos)
-                saved_markers += 1
-
-        while saved_markers < 6:
-            marker_pos = ArucoPositionInfo()
-            marker_info.append(marker_pos)
-            saved_markers += 1
-
-        self.current_state = marker_info
-        self.current_action = self.action
-        self.current_reward = self.CalculateReward()
+        return self.current_state, self.current_reward, done, x, y
 
     def GetCurrentState(self):
         saved_markers = 0
@@ -170,6 +179,10 @@ class FSAE_Env():
 
         self.current_state = current_state
 
+        for marker in self.markers.marker_ids:
+            if marker == 0:
+                self.finish_line_detected = True
+                
     def FindLowestPair(self):
 		#if first_marker_index and second_marker_index >= 0 then pair found
         self.first_marker_index = -1
@@ -181,6 +194,27 @@ class FSAE_Env():
                     self.first_marker_index = index
                     #print("ids = " + str(self.markers.marker_ids[index]) + " & " + str(self.markers.marker_ids[index+1]))
                     break
+
+    def FindLowestOddAndEven(self):
+		#if first_marker_index and second_marker_index >= 0 then pair found
+        lowest_odd = -1
+        lowest_even = -1
+
+        for index in range(self.num_of_markers - 1):
+            marker_id = self.markers.marker_ids[index]
+            if marker_id % 2 == 1:
+                lowest_odd = index
+                break
+
+        for index in range(self.num_of_markers - 1):
+            marker_id = self.markers.marker_ids[index]
+            if marker_id % 2 == 0:
+                lowest_even = index
+                break
+        
+        return lowest_odd, lowest_even
+
+
 
     def CalculateReward(self):
         self.FindLowestPair()
@@ -195,6 +229,22 @@ class FSAE_Env():
             angle_reward = 0
 
         return angle_reward
+
+    def CalculateCrossReward(self):
+        odd, even = self.FindLowestOddAndEven()
+        #print(str(self.markers.marker_ids[odd]) + " " + str(self.markers.marker_ids[even]))
+        if(odd < 0 or even < 0):
+            return 0
+
+        midpoint = self.CalculateMidPoint(self.markers.marker_poses[odd],self.markers.marker_poses[even])
+        angleToTarget = self.CalculateAngleTo(midpoint)
+        angle_reward = REWARD_SCALAR*math.cos(angleToTarget * ANGLE_REWARD_DROPOFF)
+
+        if angle_reward < 0:
+            angle_reward = 0
+
+        return angle_reward
+
     
     def CalculateMidPoint(self, mk1, mk2):
         midpoint = Point()
@@ -211,9 +261,8 @@ class FSAE_Env():
 if __name__ == '__main__':
     env = FSAE_Env()
     env.reset()
-    # while True:
-    #     action = env.action_space.sample()
-    #     env.step(action)
+    #while True:
+    #    env.CalculateCrossReward()
 
 
 
