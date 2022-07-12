@@ -12,6 +12,7 @@ from gazebo_msgs.srv import SetModelState, GetModelState
 #from kobuki_msgs.msg import BumperEvent
 
 ACTION_RATE = 5 # number of actions/sec
+LAST_MARKER_ID = 30
 
 REWARD_SCALAR = 10 #max reward value given when angle = 0 and distance = 0
 ANGLE_REWARD_DROPOFF = 6 #larger value = faster drop off of reward for increasing angle (frequency of cos wave)
@@ -159,6 +160,8 @@ class FSAE_Env():
         self.r.sleep()
         x , y = self.GetRobotPosition()
 
+        #print(self.current_reward)
+
         return self.current_state, self.current_reward, done, x, y
 
     def GetCurrentState(self):
@@ -166,6 +169,9 @@ class FSAE_Env():
         current_state = []
         for i in range(self.num_of_markers):
             if saved_markers < 6:
+                if self.markers.marker_ids[i] == 0:
+                    continue
+
                 current_state.append(self.markers.marker_poses[i].position.x)
                 current_state.append(self.markers.marker_poses[i].position.z)
                 saved_markers += 1
@@ -256,10 +262,45 @@ class FSAE_Env():
 		#calculates absolute angle deviation from facing target position in RADIANS
         return math.atan(abs(targetPosition.x/targetPosition.z))
 
+    def SetArucoMarkers(self):
+        for i in range(LAST_MARKER_ID + 1):
+            state_msg = ModelState()
+            state_msg.model_name = 'aruco_visual_marker_{}'.format(i)
+            
+            if i == 0:
+                state_msg.pose.position.x = (LAST_MARKER_ID/2) + 3 #-1.5
+                state_msg.pose.position.y = 0
+                state_msg.pose.position.z = 0.2
+                state_msg.pose.orientation.x = 0
+                state_msg.pose.orientation.y = -0.7
+                state_msg.pose.orientation.z = 0
+                state_msg.pose.orientation.w = 0.7
+            elif i % 2 == 1: # odd markers left hand side
+                state_msg.pose.position.x = (i/2.0) + 0.5 #-1.5
+                state_msg.pose.position.y = 1
+                state_msg.pose.position.z = 0.1
+                state_msg.pose.orientation.x = 0.1 
+                state_msg.pose.orientation.y = -0.7
+                state_msg.pose.orientation.z = 0.1
+                state_msg.pose.orientation.w = 0.7
+            else: # even markers right hand side
+                state_msg.pose.position.x = (i/2.0)#-1.5
+                state_msg.pose.position.y = -1
+                state_msg.pose.position.z = 0.1
+                state_msg.pose.orientation.x = -0.1 
+                state_msg.pose.orientation.y = -0.7
+                state_msg.pose.orientation.z = -0.1
+                state_msg.pose.orientation.w = 0.7
+
+
+            rospy.wait_for_service('/gazebo/set_model_state')
+            set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
+            resp = set_state(state_msg)
+
 
 if __name__ == '__main__':
     env = FSAE_Env()
-    env.reset()
+    env.SetArucoMarkers()
     #while True:
     #    env.CalculateCrossReward()
 

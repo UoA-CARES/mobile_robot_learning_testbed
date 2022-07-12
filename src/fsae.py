@@ -17,19 +17,19 @@ action_space = env.action_space.n
 PLOT_FREQ = 100
 PATH_POS_FREQ = 10
 
-EPISODES = 1000
+EPISODES = 10000
 STEPS = 500
 LEARNING_RATE = 0.0001
 MEM_SIZE = 10000
 BATCH_SIZE = 64
 GAMMA = 0.95
-EXPLORATION_MAX = 0.001#1.0
+EXPLORATION_MAX = 1.0 #1.0
 EXPLORATION_DECAY = 0.999
 EXPLORATION_MIN = 0.001
 
 FC1_DIMS = 1024
 FC2_DIMS = 512
-DEVICE = torch.device("cpu")
+DEVICE = torch.device("cuda")
 
 best_reward = 0
 average_reward = 0
@@ -140,6 +140,8 @@ class DQN_Solver:
 agent = DQN_Solver()
 #agent.network.load_state_dict(torch.load("/home/aakaash/models/moving_cartpole_dqn_1000.pth"))
 #agent.network.eval()
+
+env.SetArucoMarkers() #created perfectly spaced and oriented aruco lanes
 
 for episode in range(1, EPISODES+1):
     state = env.reset()
