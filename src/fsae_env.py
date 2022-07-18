@@ -1,18 +1,35 @@
-
+import random
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from time import sleep
+from turtle import position
 import numpy as np
 from torch import true_divide
 import rospy
 import math
 from gym import spaces
 from std_msgs.msg import Bool
-from geometry_msgs.msg import Point, Twist
+from geometry_msgs.msg import Point, Twist, Quaternion
 from cares_msgs.msg import ArucoMarkers
 from gazebo_msgs.msg import ModelState 
 from gazebo_msgs.srv import SetModelState, GetModelState
-#from kobuki_msgs.msg import BumperEvent
+from tracks import SetStraight, SetRightCurve, SetLeftCurve
+
+MARKER_POSITION_BASE = 1
+MARKER_POSITION_VARIATION_LIMIT = 0.05
+
+MARKER_ROTATION_BASE = 0.2
+MARKER_ROTATION_VARIATION_LIMIT = 0.1
+
+INNER_TURN_RADIUS = 10
+OUTER_TURN_RADIIS = INNER_TURN_RADIUS + (2 * MARKER_POSITION_BASE)
+
+MARKER_PAIRS_IN_TURN = 15
+
+LAST_MARKER_ID = 30
+
+TURN_ANGLE = 45
 
 ACTION_RATE = 5 # number of actions/sec
-LAST_MARKER_ID = 30
 
 REWARD_SCALAR = 10 #max reward value given when angle = 0 and distance = 0
 ANGLE_REWARD_DROPOFF = 6 #larger value = faster drop off of reward for increasing angle (frequency of cos wave)
@@ -45,7 +62,6 @@ class FSAE_Env():
         
         self.detector_sub = rospy.Subscriber("/camera/markers", ArucoMarkers, self.MarkerCallback)
         self.cmd_vel = rospy.Publisher("/cmd_vel_mux/input/teleop", Twist, queue_size=10)
-        #self.bump_sub = rospy.Subscriber("/mobile_base/events/bumper", BumperEvent, self.BumperCallback)
 
 
         self.markers = ArucoMarkers()
@@ -63,12 +79,6 @@ class FSAE_Env():
         self.r = rospy.Rate(ACTION_RATE)
 
 
-        # As long as you haven't ctrl + c keeping doing...
-        #while not rospy.is_shutdown():
-        #    action = self.action_space.sample()
-        #    self.step(action)
-        #    r.sleep()
-
 
     def shutdown(self):
         # Stop turtlebot
@@ -83,30 +93,17 @@ class FSAE_Env():
         self.num_of_markers = len(self.markers.marker_ids)
         self.state_updated = True
 
-    # def BumperCallback(self, data):
-    #     if (data.state == BumperEvent.PRESSED and not self.bumped):
-    #         self.bumped = True
-
-    def reset(self):
+    def reset(self, Noise=False):
         self.no_marker_count = 0
         self.finish_line_detected = False
         self.state_updated = False
-
-        #self.bumped = False
-        #RESET COORDS FOR TURTLEBOT
-        state_msg = ModelState()
-        state_msg.model_name = 'mobile_base'
-        state_msg.pose.position.x = -1.5 #-1.5
-        state_msg.pose.position.y = 0.0
-        state_msg.pose.position.z = 0.0
-        state_msg.pose.orientation.x = 0
-        state_msg.pose.orientation.y = 0
-        state_msg.pose.orientation.z = 0
-        state_msg.pose.orientation.w = 0
-
-        rospy.wait_for_service('/gazebo/set_model_state')
-        set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
-        resp = set_state(state_msg)
+        
+        if Noise == False:
+            self.ResetRobotPosition()
+        else:
+            self.ResetRobotPosition(Noise=True)
+            SetRightCurve()
+            #SetStraight(Noise=True)
 
         while not self.state_updated:
             pass
@@ -126,18 +123,15 @@ class FSAE_Env():
     def step(self, action):
         move_cmd = Twist()
         done = False
-
         prev_state = self.current_state #store prev state in variable
         action_taken = self.action # store previous action in variable
         self.GetCurrentState() #get new state and store in self.current_state variable
         self.action = action #store current action taken in self.action variable
         self.current_reward = self.CalculateCrossReward() #get reward for current state
-
-
         
         if self.finish_line_detected == True:
                 done = True
-                self.current_reward += 1000
+                #self.current_reward += 1000
 
         if self.current_reward == 0:
             self.no_marker_count += 1
@@ -159,8 +153,6 @@ class FSAE_Env():
         self.cmd_vel.publish(move_cmd)
         self.r.sleep()
         x , y = self.GetRobotPosition()
-
-        #print(self.current_reward)
 
         return self.current_state, self.current_reward, done, x, y
 
@@ -262,48 +254,32 @@ class FSAE_Env():
 		#calculates absolute angle deviation from facing target position in RADIANS
         return math.atan(abs(targetPosition.x/targetPosition.z))
 
-    def SetArucoMarkers(self):
-        for i in range(LAST_MARKER_ID + 1):
-            state_msg = ModelState()
-            state_msg.model_name = 'aruco_visual_marker_{}'.format(i)
-            
-            if i == 0:
-                state_msg.pose.position.x = (LAST_MARKER_ID/2) + 3 #-1.5
-                state_msg.pose.position.y = 0
-                state_msg.pose.position.z = 0.2
-                state_msg.pose.orientation.x = 0
-                state_msg.pose.orientation.y = -0.7
-                state_msg.pose.orientation.z = 0
-                state_msg.pose.orientation.w = 0.7
-            elif i % 2 == 1: # odd markers left hand side
-                state_msg.pose.position.x = (i/2.0) + 0.5 #-1.5
-                state_msg.pose.position.y = 1
-                state_msg.pose.position.z = 0.1
-                state_msg.pose.orientation.x = 0.1 
-                state_msg.pose.orientation.y = -0.7
-                state_msg.pose.orientation.z = 0.1
-                state_msg.pose.orientation.w = 0.7
-            else: # even markers right hand side
-                state_msg.pose.position.x = (i/2.0)#-1.5
-                state_msg.pose.position.y = -1
-                state_msg.pose.position.z = 0.1
-                state_msg.pose.orientation.x = -0.1 
-                state_msg.pose.orientation.y = -0.7
-                state_msg.pose.orientation.z = -0.1
-                state_msg.pose.orientation.w = 0.7
 
+    def ResetRobotPosition(self, Noise=False):
+        if Noise == True:
+            robot_position_variation = random.random() - 0.5
+        else:
+            robot_position_variation = 0
 
-            rospy.wait_for_service('/gazebo/set_model_state')
-            set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
-            resp = set_state(state_msg)
+        state_msg = ModelState()
+        state_msg.model_name = 'mobile_base'
+        state_msg.pose.position.x = -1.5 #-1.5
+        state_msg.pose.position.y = robot_position_variation
+        state_msg.pose.position.z = 0.0
+        state_msg.pose.orientation.x = 0
+        state_msg.pose.orientation.y = 0
+        state_msg.pose.orientation.z = 0
+        state_msg.pose.orientation.w = 0
+
+        rospy.wait_for_service('/gazebo/set_model_state')
+        set_state = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
+        resp = set_state(state_msg)
+
 
 
 if __name__ == '__main__':
     env = FSAE_Env()
-    env.SetArucoMarkers()
-    #while True:
-    #    env.CalculateCrossReward()
-
+    env.reset()
 
 
 
