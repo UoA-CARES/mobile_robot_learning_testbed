@@ -102,8 +102,8 @@ class FSAE_Env():
             self.ResetRobotPosition()
         else:
             self.ResetRobotPosition(Noise=True)
-            SetRightCurve()
-            #SetStraight(Noise=True)
+            #SetLeftCurve()
+            SetStraight(Noise=True)
 
         while not self.state_updated:
             pass
@@ -280,6 +280,7 @@ class FSAE_Env():
 if __name__ == '__main__':
     env = FSAE_Env()
     env.reset()
+    SetStraight()
 
 
 

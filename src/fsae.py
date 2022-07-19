@@ -25,7 +25,7 @@ LEARNING_RATE = 0.0001
 MEM_SIZE = 10000
 BATCH_SIZE = 64
 GAMMA = 0.95
-EXPLORATION_MAX = 1 #1.0
+EXPLORATION_MAX = 1.0 #1.0
 EXPLORATION_DECAY = 0.999
 EXPLORATION_MIN = 0.001 #0.001
 
@@ -208,7 +208,7 @@ def trainRightTurn():
     average_reward= []
 
     agent = DQN_Solver()
-    #agent.network.load_state_dict(torch.load("../../../../models/right_turn/moving_cartpole_dqn_10000.pth"))
+    #agent.network.load_state_dict(torch.load("../../../../models/right_turn_2/moving_cartpole_dqn_3500.pth"))
     #agent.network.eval()
 
     for episode in range(1, EPISODES+1):
@@ -263,11 +263,11 @@ def trainRightTurn():
                 break
 
 def WriteEpisodeRewardToFile(reward):
-    reward_file = open("../../../../plots/right_turn_2/rewards.txt", "a")
+    reward_file = open("../../../../plots/noisy_straight_2/rewards.txt", "a")
     reward_file.write(str(reward) + "\n")
     reward_file.close()
             
 
 if __name__ == '__main__':
-    #trainStraight()
-    trainRightTurn()
+    trainStraight()
+    #trainRightTurn()
