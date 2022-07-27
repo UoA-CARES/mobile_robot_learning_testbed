@@ -8,7 +8,8 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import fsae_env
-from tracks import SetStraight, SetRightCurve, SetLeftCurve
+from time import sleep
+from tracks import TrackGenerator
 
 env = fsae_env.FSAE_Env()
 
@@ -20,13 +21,13 @@ PATH_POS_FREQ = 100
 AVERAGE_REWARD_LAST_N_EPISODES = 100
 
 EPISODES = 10000
-STEPS = 500
+STEPS = 1000
 LEARNING_RATE = 0.0001
-MEM_SIZE = 10000
+MEM_SIZE = 50000 # 10000
 BATCH_SIZE = 64
 GAMMA = 0.95
 EXPLORATION_MAX = 1.0 #1.0
-EXPLORATION_DECAY = 0.999
+EXPLORATION_DECAY = 0.9999 # 0.999
 EXPLORATION_MIN = 0.001 #0.001
 
 FC1_DIMS = 1024
@@ -144,11 +145,13 @@ def trainStraight():
     average_reward= []
 
     agent = DQN_Solver()
-    #agent.network.load_state_dict(torch.load("../../../../models/noisy_straight/moving_cartpole_dqn_10000.pth"))
+    #agent.network.load_state_dict(torch.load("../../../../models/all_tracks/moving_cartpole_dqn_2000.pth"))
     #agent.network.eval()
 
+    trackGenerator = TrackGenerator()
+
     for episode in range(1, EPISODES+1):
-        state = env.reset(Noise=True)
+        state, seg1Id, seg2Id = env.reset(Noise=True)
         robot_x = []
         robot_y = []
 
@@ -157,7 +160,7 @@ def trainStraight():
 
         for step in range(1, STEPS):
             action = agent.choose_action(state)
-            state_, reward, done, x, y,  = env.step(action) 
+            state_, reward, done, x, y  = env.step(action) 
             state_ = np.reshape(state_, [1, observation_space])
             agent.memory.add(state, action, reward, state_, done)
             agent.learn()
@@ -180,94 +183,42 @@ def trainStraight():
                 episode_number.append(episode)
                 average_reward.append(average_reward_current_episode)
 
-                print("Episode {} Average Reward {} Best Reward {} Last Reward {} Epsilon {}".format(episode, average_reward_current_episode, best_reward, score, agent.returning_epsilon()))
+                print("Ep {} Avg {} Best {} Last {} Epsilon {}, Seg1 {} Seg2 {}".format(episode, average_reward_current_episode, best_reward, score, agent.returning_epsilon(), seg1Id*15, seg2Id*15))
 
                 if episode % PLOT_FREQ == 0:
                     plt.figure(1)
                     plt.plot(episode_number, average_reward)
                     plt.title("DQN Straight %s episodes" % str(episode))
-                    plt.savefig("../../../../plots/noisy_straight_2/moving_cartpole_dqn_{}_episodes.png".format(episode))
+                    plt.savefig("../../../../plots/double/moving_cartpole_dqn_{}_episodes.png".format(episode))
 
-                    torch.save(agent.network.state_dict(),"../../../../models/noisy_straight_2/moving_cartpole_dqn_{}.pth".format(episode))
+                    torch.save(agent.network.state_dict(),"../../../../models/double/moving_cartpole_dqn_{}.pth".format(episode))
                 
                 if episode % PATH_POS_FREQ == 0:
+                    markers_x, markers_y = trackGenerator.GetMarkerPositions()
+
                     # write robot position path for each episode
-                    file_object = open("../../../../plots/noisy_straight_2/data.txt", "a")
+                    file_object = open("../../../../plots/double/data.txt", "a")
+
+                    file_object.write("Ep{} ".format(episode) + str(seg1Id) + " " + str(seg2Id) + "\n")
+
+                    for i in range(len(markers_x)):
+                        file_object.write(str(i+1) + " " + str(markers_x[i]) + " " + str(markers_y[i]) + "\n")
+
                     for pos in range(len(robot_x)):
-                        file_object.write(str(robot_x[pos]) + " " + str(robot_y[pos]) + "\n")
+                        file_object.write("0 " + str(robot_x[pos]) + " " + str(robot_y[pos]) + "\n")
+
                     file_object.write("End Episode {}\n".format(episode))
+
                     file_object.close()
 
                 break
 
-def trainRightTurn():
-
-    best_reward = 0
-    rewards = []
-    episode_number = []
-    average_reward= []
-
-    agent = DQN_Solver()
-    #agent.network.load_state_dict(torch.load("../../../../models/right_turn_2/moving_cartpole_dqn_3500.pth"))
-    #agent.network.eval()
-
-    for episode in range(1, EPISODES+1):
-        state = env.reset(Noise=True)
-        robot_x = []
-        robot_y = []
-
-        state = np.reshape(state, [1, observation_space])
-        score = 0
-
-        for step in range(1, STEPS):
-            action = agent.choose_action(state)
-            state_, reward, done, x, y,  = env.step(action) 
-            state_ = np.reshape(state_, [1, observation_space])
-            agent.memory.add(state, action, reward, state_, done)
-            agent.learn()
-            state = state_
-            score += reward
-
-            robot_x.append(x)
-            robot_y.append(y)
-
-            if done or step == STEPS - 1:
-                if score > best_reward:
-                    best_reward = score
-
-                WriteEpisodeRewardToFile(score)
-
-                rewards.append(score)
-                average_reward_current_episode = np.mean(rewards[-AVERAGE_REWARD_LAST_N_EPISODES:])
-                episode_number.append(episode)
-                average_reward.append(average_reward_current_episode)
-
-                print("Episode {} Average Reward {} Best Reward {} Last Reward {} Epsilon {}".format(episode, average_reward_current_episode, best_reward, score, agent.returning_epsilon()))
-
-                if episode % PLOT_FREQ == 0:
-                    plt.figure(2)
-                    plt.plot(episode_number, average_reward)
-                    plt.title("DQN %s episodes" % str(episode))
-                    plt.savefig("../../../../plots/right_turn_2/moving_cartpole_dqn_{}_episodes.png".format(episode))
-
-                    torch.save(agent.network.state_dict(),"../../../../models/right_turn_2/moving_cartpole_dqn_{}.pth".format(episode))
-                
-                if episode % PATH_POS_FREQ == 0:
-                    # write robot position path for each episode
-                    file_object = open("../../../../plots/right_turn_2/data.txt", "a")
-                    for pos in range(len(robot_x)):
-                        file_object.write(str(robot_x[pos]) + " " + str(robot_y[pos]) + "\n")
-                    file_object.write("End Episode {}\n".format(episode))
-                    file_object.close()
-
-                break
 
 def WriteEpisodeRewardToFile(reward):
-    reward_file = open("../../../../plots/noisy_straight_2/rewards.txt", "a")
+    reward_file = open("../../../../plots/double/rewards.txt", "a")
     reward_file.write(str(reward) + "\n")
     reward_file.close()
             
 
 if __name__ == '__main__':
     trainStraight()
-    #trainRightTurn()

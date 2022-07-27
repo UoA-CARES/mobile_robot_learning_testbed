@@ -12,7 +12,7 @@ from geometry_msgs.msg import Point, Twist, Quaternion
 from cares_msgs.msg import ArucoMarkers
 from gazebo_msgs.msg import ModelState 
 from gazebo_msgs.srv import SetModelState, GetModelState
-from tracks import SetStraight, SetRightCurve, SetLeftCurve
+import tracks
 
 MARKER_POSITION_BASE = 1
 MARKER_POSITION_VARIATION_LIMIT = 0.05
@@ -52,6 +52,8 @@ class FSAE_Env():
         #observation shape = (12,)
         self.observation_space = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
         self.action_space = spaces.Discrete(2)
+        self.trackGenerator = tracks.TrackGenerator()
+        self.segment_id = -6
         #self.bumped = False
 
         # Tell user how to stop TurtleBot
@@ -99,17 +101,20 @@ class FSAE_Env():
         self.state_updated = False
         
         if Noise == False:
-            self.ResetRobotPosition()
+            self.ResetRobotPosition()  
+
         else:
             self.ResetRobotPosition(Noise=True)
-            #SetLeftCurve()
-            SetStraight(Noise=True)
+            self.trackGenerator.ResetOrigin()
+            seg1Id = math.ceil(random.random()* 13) - 7
+            seg2Id = math.ceil(random.random()* 13) - 7
+            self.trackGenerator.SetTrack(seg1Id, seg2Id)
 
         while not self.state_updated:
             pass
 
         self.GetCurrentState() #get new state and store in self.current_state variable
-        return self.current_state
+        return self.current_state, seg1Id, seg2Id
 
     def GetRobotPosition(self):
         rospy.wait_for_service('/gazebo/get_model_state')
@@ -135,12 +140,8 @@ class FSAE_Env():
 
         if self.current_reward == 0:
             self.no_marker_count += 1
-            if self.no_marker_count > 10:
+            if self.no_marker_count > 20:
                 done = True
-
-        # if self.bumped:
-        #     done = True
-        #     self.current_reward += 1000
 
         if not done:
             if action == 0:
@@ -158,14 +159,18 @@ class FSAE_Env():
 
     def GetCurrentState(self):
         saved_markers = 0
+        
+        marker_poses = self.markers.marker_poses
+        marker_poses.sort(key=lambda x: x.position.z, reverse=False)
+
         current_state = []
         for i in range(self.num_of_markers):
             if saved_markers < 6:
                 if self.markers.marker_ids[i] == 0:
                     continue
 
-                current_state.append(self.markers.marker_poses[i].position.x)
-                current_state.append(self.markers.marker_poses[i].position.z)
+                current_state.append(marker_poses[i].position.x)
+                current_state.append(marker_poses[i].position.z)
                 saved_markers += 1
 
         while saved_markers < 6:
@@ -175,6 +180,7 @@ class FSAE_Env():
             saved_markers += 1
 
         self.current_state = current_state
+        print(current_state)
 
         for marker in self.markers.marker_ids:
             if marker == 0:
@@ -279,8 +285,11 @@ class FSAE_Env():
 
 if __name__ == '__main__':
     env = FSAE_Env()
-    env.reset()
-    SetStraight()
+    #env.reset()
+    while True:
+        env.GetCurrentState()
+        sleep(1)
+    #SetStraight()
 
 
 
