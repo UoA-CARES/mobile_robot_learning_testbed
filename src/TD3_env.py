@@ -1,4 +1,5 @@
 import random
+from sqlite3 import complete_statement
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from time import sleep
 from turtle import position
@@ -15,7 +16,7 @@ from gazebo_msgs.srv import SetModelState, GetModelState
 from tracks2 import TrackGenerator
 from cmath import inf
 
-MAX_TURN_SPEED = 0.2
+MAX_TURN_SPEED = 0.4
 MAX_LINEAR_SPEED = 0.5
 
 MARKER_POSITION_BASE = 1
@@ -75,7 +76,7 @@ class FSAE_Env():
 
 
         self.markers = ArucoMarkers()
-        self.action = Twist()
+        self.action = 0.0
         self.num_of_markers = 0
 
         self.current_state = [ArucoPositionInfo(), ArucoPositionInfo(), ArucoPositionInfo(), ArucoPositionInfo(), ArucoPositionInfo(), ArucoPositionInfo()]
@@ -117,6 +118,7 @@ class FSAE_Env():
         segmentId = self.segmentList[self.current_segment]
         self.trackGenerator.SetBySegmentId(segmentId,self.current_segment%2, self.noise)
             
+
     def shutdown(self):
         # Stop turtlebot
         rospy.loginfo("Stop TurtleBot")
@@ -129,12 +131,16 @@ class FSAE_Env():
         self.markers = data
         self.num_of_markers = len(self.markers.marker_ids)
         self.state_updated = True
+        
+    def generate_sample_act(self):
+        # Get random value between -1 and 1 (normalised)
+        return np.array([np.clip(random.uniform(-1,1), -1, 1)])
 
     def reset(self):
 
         self.SetFirstTwoSegments()
-        self.ResetRobotPosition() 
-            
+        self.ResetRobotPosition()  
+
         self.state_updated = False
 
         while not self.state_updated:
@@ -164,6 +170,7 @@ class FSAE_Env():
 
         return x, y, error
 
+
     def CalculateDistanceToCenterline(self, x, y):
         min_distance_to_center = inf
         for j in range(0, len(self.centerline_x)):
@@ -174,6 +181,7 @@ class FSAE_Env():
 
         return min_distance_to_center, completion
 
+    # Checks if atleast 1 Odd AND 1 Even Marker is visible
     def PairPresent(self):
         num_odd = 0
         num_even = 0
@@ -196,12 +204,16 @@ class FSAE_Env():
         action_taken = self.action # store previous action in variable
         self.GetCurrentState() #get new state and store in self.current_state variable
         self.action = action #store current action taken in self.action variable
-        self.current_reward = self.CalculateCrossReward() #get reward for current state
+
+        #delta_action = abs(action_taken - self.action) #difference between current and previous action
+        #extra_reward = (-2.5*delta_action)+5 #function to give extra reward (MORE REWARD FOR SMOOTHER CHANGE IN ACTION)
+
+        self.current_reward = self.CalculateCrossReward() #+ extra_reward #get reward for current state
 
         if self.finish_line_detected == True:
-                done = True
                 self.completion = 100
-
+                done = True
+        
         if not self.PairPresent():
             self.no_marker_count += 1
             if self.no_marker_count > 10:
@@ -211,12 +223,9 @@ class FSAE_Env():
 
         if not done:
             self.CheckSegmentCrossed()
-            if action == 0:
-                move_cmd.angular.z = MAX_TURN_SPEED
-            else:
-                move_cmd.angular.z = -MAX_TURN_SPEED
-            #constant forward velocity
-            move_cmd.linear.x = MAX_LINEAR_SPEED #0.5
+            # take normalised action (between -1 and 1) and multiply by MAX_TURN_SPEED to get rotational velocity between -MAX_TURN_SPEED and +MAX_TURN_SPEED
+            move_cmd.angular.z = action*MAX_TURN_SPEED
+            move_cmd.linear.x = MAX_LINEAR_SPEED #constant forward velocity
             self.cmd_vel.publish(move_cmd)
 
         #if we get too close to a marker, end the episode to avoid collision/going off track
@@ -367,7 +376,7 @@ class FSAE_Env():
 
         state_msg = ModelState()
         state_msg.model_name = 'mobile_base'
-        state_msg.pose.position.x = 1 #-1.5
+        state_msg.pose.position.x = 1 #1 for oval track #-1.5 for 2 segment training
         state_msg.pose.position.y = robot_position_variation
         state_msg.pose.position.z = 0.0
         state_msg.pose.orientation.x = 0
@@ -383,7 +392,7 @@ class FSAE_Env():
 
 if __name__ == '__main__':
     env = FSAE_Env()
-    segmentList = [-6, -6, 0, -6, -6, 0]
+    segmentList = [-6, 6, 6, 0, 6, -6, 6,  6, 0, 6]
     env.SetTrackSegmentList(segmentList)
     
     env.SetFirstTwoSegments()
