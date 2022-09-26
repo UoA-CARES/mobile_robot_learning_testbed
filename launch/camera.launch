@@ -1,23 +1,8 @@
 <launch>
-
-<!--<include file="$(find turtlebot_bringup)/launch/minimal.launch"/>
-
-<include file="$(find realsense2_camera)/launch/rs_camera.launch">
-	<arg name="align_depth" value="true"/>
-</include>
--->
-
 <include file="$(find aruco_detector)/launch/mono_aruco_detector.launch">
   <arg name="ns"            value="camera"/>
   <arg name="image"         value="rgb/image_raw"/>
   <arg name="camera_info"   value="rgb/camera_info"/>
   <arg name="marker_length" value="100.0"/> <!--mm-->
-  <!--
-  <arg name="depth_image"   value="aligned_depth_to_color/image_raw"/>
-  <arg name="camera_info"   value="aligned_depth_to_color/camera_info"/>
-  -->
 </include>
-
-<!--<node pkg="fsae_control" type="detect.py" name="detector_node" />-->
-
 </launch>

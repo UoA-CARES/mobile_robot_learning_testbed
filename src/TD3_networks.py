@@ -1,3 +1,9 @@
+"""
+Authors:  Aakaash Salvaji, Harry Taylor, David Valencia, Trevor Gee, Henry Williams
+The University of Auckland
+
+TD3 Networks
+"""
 
 from argparse import Action
 import torch
