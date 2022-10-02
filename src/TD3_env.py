@@ -36,10 +36,10 @@ class ArucoPositionInfo():
 		self.z = 100.0
 		self.id = 0
 
-class FSAE_Env():
+class TD3_Env():
 
     def __init__(self):
-        rospy.init_node('FSAE_Env', anonymous=False)
+        rospy.init_node('TD3_Env', anonymous=False)
 
         self.segmentList = []
         self.observation_space = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
