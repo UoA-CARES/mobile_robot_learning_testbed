@@ -5,25 +5,27 @@ Instructions To Set Up & Run The Code
  </h1>
 
 # SETUP
-## Install ROS
+## Install ROS/Turtlebot2 Files
+- Download turtlebot_setup
+- unzip
+- cd into folder
+- chmod
+- run ./setup.sh
 
-## Download Turtlebot2 Packages
+## Create Workspace
 
-## Install RealSense Camera Packages
+### Pull Github Repository
 
-## CatkinMake
+### Pull CARES Messages
 
-## Pull Github Repository
+### Pull Aruco Detector
 
-## Pull CARES Messages
+## Add Models/World/Launch Files
+### Add Aruco Models to Gazebo Models Folder
 
-## Pull Aruco Detector
+### Add World-file to Gazebo Worlds Folder
 
-## Add Aruco Models to Gazebo Models Folder
-
-## Add World-file to Gazebo Worlds Folder
-
-## Add World launch-file to Gazebo launch Folder
+### Add World launch-file to Gazebo launch Folder
 
 # Training/Simulation Testing
 
