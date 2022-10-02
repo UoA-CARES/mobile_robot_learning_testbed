@@ -16,10 +16,10 @@ import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-import fsae_env
+import DQN_env
 import os
 
-env = fsae_env.FSAE_Env()
+env = DQN_env.DQN_Env()
 
 observation_space = env.observation_space.shape[0]
 action_space = env.action_space.n
