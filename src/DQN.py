@@ -46,10 +46,8 @@ GAMMA = 0.95
 EXPLORATION_MAX = 1.0
 EXPLORATION_DECAY = 0.9999
 EXPLORATION_MIN = 0.001 
-# Testing parameters TODO: Change parameters implicitly
-EXPLORATION_MAX = 0.0
-EXPLORATION_DECAY = 0.9999
-EXPLORATION_MIN = 0.0 
+# Testing parameters 
+TEST_EXPLORATION = 0.00
 
 FC1_DIMS = 1024
 FC2_DIMS = 512
@@ -111,9 +109,12 @@ class ReplayBuffer:
         return states, actions, rewards, states_, dones
 
 class DQN_Solver:
-    def __init__(self):
+    def __init__(self, test=False):
         self.memory = ReplayBuffer()
         self.exploration_rate = EXPLORATION_MAX
+        self.test = test
+        if test:
+            self.exploration_rate = TEST_EXPLORATION
         self.network = Network()
 
     def choose_action(self, observation):
@@ -266,7 +267,7 @@ def train(episodes, steps, folder=FOLDER, noise=False):
 #Function to test DQN Model, Noise = track noise in testing
 def test(episodes,steps, track,folder=FOLDER,noise=False):
 
-    agent = DQN_Solver()
+    agent = DQN_Solver(test=True)
 
     # Load model 5000 from folder created in training (CAN CHANGE EPISODE TO WHATEVER YOU WANT)
     agent.network.load_state_dict(torch.load(f"../models/{folder}/{folder}_dqn_5000.pth"))
