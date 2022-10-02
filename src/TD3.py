@@ -21,7 +21,7 @@ import math
 # Import TD3 classes 
 from TD3_memory import MemoryClass
 from TD3_networks import Actor_NN, Critic_NN, ModelNet_probabilistic_transition
-from TD3_env import FSAE_Env
+from TD3_env import TD3_Env
 
 # Folder name which to create/load Models and Plots, generated from training
 FOLDER = "TD3_TEST"
@@ -690,14 +690,14 @@ def WriteTestRewardsToFile(folder, reward, avg_error, completion, seg1, seg2, st
 
 # USE THESE FUNCTIONS TO CALL TESTING AND TRAINING
 def train(num_exploration_episodes=EXPLORATION_EPISODES,num_training_episodes=EXPLORATION_EPISODES,steps=STEPS,folder=FOLDER,noise=False):
-    env   = FSAE_Env()
+    env   = TD3_Env()
     agent = TD3_Agent(env)
     style = "MFRL" # model free RL
     run_exploration(env, num_exploration_episodes, steps, agent, noise)
     run_training(env, num_training_episodes, steps, agent, style, folder, noise)
 
 def test(episodes,steps,folder,noise,track):
-    env   = FSAE_Env()
+    env   = TD3_Env()
     agent = TD3_Agent(env)
     style = "MFRL" # model free RL
     run_testing(env, episodes, steps, agent, style, track, folder, noise)
