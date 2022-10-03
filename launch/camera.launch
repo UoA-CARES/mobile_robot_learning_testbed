@@ -1,8 +1,0 @@
-<launch>
-<include file="$(find aruco_detector)/launch/mono_aruco_detector.launch">
-  <arg name="ns"            value="camera"/>
-  <arg name="image"         value="rgb/image_raw"/>
-  <arg name="camera_info"   value="rgb/camera_info"/>
-  <arg name="marker_length" value="100.0"/> <!--mm-->
-</include>
-</launch>
