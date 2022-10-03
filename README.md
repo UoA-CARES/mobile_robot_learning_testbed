@@ -27,8 +27,7 @@ Results of training:
 ![](https://github.com/UoA-CARES/mobile_robot_learning_testbed/blob/main/images/results.png)
 
 ## Video
-A video showing the robot executing the tasks during the training process can be found at:
-[TEXT HERE](LINK HERE)
+A video showing the robot executing the tasks during the training process can be found at [this youtube link.](https://youtu.be/TYCrK8-dnqE)
 
 ## Citation
 If you use either the code or data in your paper, please kindly star this repo and cite our paper
