@@ -30,10 +30,10 @@ If setup successfully completed, you should be able to run Gazebo to see the rob
 3. Clone this repository:
 > $ git clone https://github.com/UoA-CARES/mobile_robot_learning_testbed.git
 4. Clone other required repositories:
-> $ git clone https://github.com/UoA-CARES/cares_msgs
+> $ git clone https://github.com/UoA-CARES/cares_msgs \
 > $ git clone https://github.com/maraatech/aruco_detector
 5. Build and compile workspace:
-> $ cd ..
+> $ cd .. \
 > $ catkin_make
 6. Define source (so you don't have to do it everytime you open a terminal):
 > $ echo "~/Directory_Name/devel/setup.bash" >> ~/.bashrc
