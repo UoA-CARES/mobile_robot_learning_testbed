@@ -23,7 +23,7 @@ If setup successfully completed, you should be able to run Gazebo to see the rob
 
 1. Open New Terminal
 2. Setup working directory:
-> $ mkdir Directory_Name
+> $ mkdir Directory_Name\
 > $ cd Directory_Name
 > $ mkdir src
 > $ cd src
