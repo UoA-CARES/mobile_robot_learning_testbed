@@ -26,7 +26,7 @@ If setup successfully completed, you should be able to run Gazebo to see the rob
 > $ mkdir Directory_Name\
 > $ cd Directory_Name\
 > $ mkdir src\
-> $ cd src\
+> $ cd src
 3. Clone this repository:
 > $ git clone https://github.com/UoA-CARES/mobile_robot_learning_testbed.git
 4. Clone other required repositories:
