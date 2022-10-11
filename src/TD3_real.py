@@ -2,11 +2,9 @@
 Authors:  Aakaash Salvaji, Harry Taylor, David Valencia, Trevor Gee, Henry Williams
 The University of Auckland
 
-TD3 Model
-Task: Autonomous Control of a Turtlebot2 as a racecar
-NOTE: Run training with specified FOLDER name, then run testing using same FOLDER name
+TD3 Real
+Task: Run this file to begin control of real turtlebot robotic platform, single episode at a time
 """
-
 from sqlite3 import complete_statement
 import torch
 import torch.nn as nn
@@ -18,27 +16,13 @@ import matplotlib.pyplot as plt
 import os
 import math
 
-# Import TD3 classes 
+# Import TD3 classes
 from TD3_memory import MemoryClass
 from TD3_networks import Actor_NN, Critic_NN, ModelNet_probabilistic_transition
-from TD3_env import TD3_Env
+from TD3_real_env import TD3_Real_Env
 
-# Folder name which to create/load Models and Plots, generated from training
-FOLDER = "TD3_TEST"
-
-# Frequency at which to generate plot of average rewards and save model
-PLOT_FREQ = 500
-# Number of episodes to average rewards by for plotting
-AVERAGE_REWARD_LAST_N_EPISODES = 100
-# Frequency at which to save robot path to file
-PATH_POS_FREQ = 50
-
-# Number of exploration episodes before training
-EXPLORATION_EPISODES = 100
-
-EPISODES = 15000
 STEPS = 2000
-  
+
 class TD3_Agent:
 
     def __init__(self, env):
@@ -450,257 +434,56 @@ class TD3_Agent:
                 self.add_imagined_experience_memory(state, action, reward_d, next_state, done)
 
 
-
-#Function to allow exploration Noise = track noise in exploration
-def run_exploration(env, episodes, steps, agent, noise=False):
-    for episode in range(1, episodes+1):
-        # Give 2 random "segmentId"s which determine shape of exploration track sections for each episode (see TrackGenerator for more on segmentIDs)
-        seg1Id = math.ceil(random.random()* 13) - 7
-        seg2Id = math.ceil(random.random()* 13) - 7
-        trackSegmentList = [seg1Id, seg2Id]
-        
-        # Stores track information in environment, and returns marker postions
-        markers_x, markers_y = env.SetTrackSegmentList(trackSegmentList,noise)
-        seg1Id = trackSegmentList[0]
-        seg2Id = trackSegmentList[1]
-
-        state = env.reset()
-        state = np.array(state)
-
-        for step in range(1, steps):
-            action   = env.generate_sample_act()
-            next_state,reward,done, _,_,_, _= env.step(action)
-            next_state = np.array(next_state)
-
-            agent.add_real_experience_memory(state, action, reward, next_state, done)
-            state = next_state
-            if done:
-                break
-        
-        print(f"---- Exploration {episode}/{episodes} ----")
-    print(f"******* -----{episodes} for exploration ended-----********* ")
-
-#Function to train TD3 Model, track_noise = track noise in training
-def run_training(env, episodes, steps, agent, style, folder=FOLDER, track_noise=False):
-
-    rewards     = []
-    best_reward = 0
-    rewards = []
-    episode_number = []
-    average_reward= []
-
-    # Creates plots & models folder, on level above current folder, and creates subfolders to store plots and models of this training
-    # Ensure new folder name is given to each training session, as data will be appended/overwritten if using existing folder name
-    if not os.path.exists(f"../plots/{folder}"):
-        os.makedirs(f"../plots/{folder}")
+def run_testing(env, horizont, agent, style):
     
-    if not os.path.exists(f"../models/{folder}/best"):
-        os.makedirs(f"../models/{folder}/best")
 
-    for episode in range(1, episodes+1):
-
-        # Give 2 random "segmentId"s which determine shape of training track section for each episode (see TrackGenerator for more on segmentIDs)
-        seg1Id = math.ceil(random.random()* 13) - 7
-        seg2Id = math.ceil(random.random()* 13) - 7
-        trackSegmentList = [seg1Id, seg2Id]
-        
-        # Stores track information in environment, and returns marker postions
-        markers_x, markers_y = env.SetTrackSegmentList(trackSegmentList,track_noise)
-        seg1Id = trackSegmentList[0]
-        seg2Id = trackSegmentList[1]
-
-        state = env.reset()
-        state = np.array(state)
-
-        # Arrays to store robot position at each time step to write to path.txt file
-        robot_x = []
-        robot_y = []
-
-        episode_reward = 0
-        sum_error = 0
-
-        for step in range(1, steps+1):
-            
-            action   = agent.get_action_from_policy(state)
-            noise    = np.random.normal(0, scale=0.1, size=1)
-            action   = action + noise
-            action   = np.clip(action, -1, 1)
-
-            next_state,reward,done,x, y, error, completion= env.step(action)
-            next_state = np.array(next_state)
-
-            agent.add_real_experience_memory(state, action, reward, next_state, done)
-            state = next_state
-            episode_reward += reward
-            sum_error += error
-
-            robot_x.append(x)
-            robot_y.append(y)
-            
-            # learn
-            if style == "MFRL":
-                agent.step_training(style)
-
-            elif style == "MBRL": 
-                agent.transition_model_learn()
-                agent.generate_dream_samples()
-                agent.step_training(style)
-            
-            
-            if done or step == steps:
-                
-                # Store best episode (highest reward) model (overwritten)
-                if episode_reward > best_reward:
-                    best_reward = episode_reward
-                    torch.save(agent.actor.state_dict(),f"../models/{folder}/best/actor.pth")
-                    torch.save(agent.critic_q1.state_dict(),f"../models/{folder}/best/critic_q1.pth")
-                    torch.save(agent.critic_q2.state_dict(),f"../models/{folder}/best/critic_q2.pth")
-                    file_object = open(f"../models/{folder}/best/best.txt", "a")
-                    file_object.write(f"Best Ep = {episode}\n")
-                    file_object.close()
-                
-                average_ep_error =  sum_error/step
-
-                # Write episode information to rewards.txt
-                WriteEpisodeRewardToFile(folder, episode_reward, average_ep_error, completion, seg1Id, seg2Id, step)
-
-                rewards.append(episode_reward)
-                average_reward_current_episode = np.mean(rewards[-AVERAGE_REWARD_LAST_N_EPISODES:])
-                episode_number.append(episode)
-                average_reward.append(average_reward_current_episode)
-
-                print(f"Ep {episode} Avg {average_reward_current_episode} Best {best_reward} Last {episode_reward} , Seg1 {seg1Id*15} Seg2 {seg2Id*15}, Steps {steps}, Completion {completion}%")
-                
-                # Save new model, and plot of average reward (from last AVERAGE_REWARD_LAST_N_EPISODES episodes) every PLOT_FREQ episodes to show training progression
-                if episode % PLOT_FREQ == 0:
-                    plt.figure(1)
-                    plt.plot(episode_number, average_reward)
-                    plt.title(f"TD3 {episode} episodes")
-                    plt.savefig(f"../plots/{folder}/{folder}_td3_{episode}_episodes.png")
-
-                    torch.save(agent.actor.state_dict(),f"../models/{folder}/{folder}_td3_{episode}_actor.pth")
-                    torch.save(agent.critic_q1.state_dict(),f"../models/{folder}/{folder}_td3_{episode}_critic_q1.pth")
-                    torch.save(agent.critic_q2.state_dict(),f"../models/{folder}/{folder}_td3_{episode}_critic_q2.pth")
-                
-                # Append marker postions, and robot positions at each step showing path taken for every PATH_POS_FREQ episodes to path.txt
-                if episode % PATH_POS_FREQ == 0:
-
-                    file_object = open(f"../plots/{folder}/path.txt", "a")
-
-                    file_object.write(f"Ep{episode} {seg1Id} {seg2Id} {step} {completion} {average_ep_error}\n")
-
-                    for i in range(30*len(trackSegmentList)):
-                        file_object.write(f"{i+1} {markers_x[i]} {markers_y[i]}\n")
-
-                    for pos in range(len(robot_x)):
-                        file_object.write(f"0 {robot_x[pos]} {robot_y[pos]}\n")
-
-                    file_object.write(f"End Episode {episode}\n")
-
-                    file_object.close()
-
-                break
-    plt.close()
-    print(f"******* -----{episodes} episodes for training ended-----********* ")
-
-    
-#Function to test TD3 Model, Noise = track noise in testing
-def run_testing(env, episodes_test, steps, agent, style, track, folder=FOLDER, noise=False):
-
-    # Load model 5000 from folder created in training (CAN CHANGE EPISODE TO WHATEVER YOU WANT)
-    model_episode = 5000
-    # Load actor
-    agent.actor.load_state_dict(torch.load(f"../models/{folder}/{folder}_td3_{model_episode}_actor.pth"))
+    #Change model file names and path as saved in training
+    #Load actor
+    agent.actor.load_state_dict(torch.load("../models/td3_ep_5000_no_noise_actor.pth"))
     agent.actor.eval()
-    # Load Critic Q1
-    agent.critic_q1.load_state_dict(torch.load(f"../models/{folder}/{folder}_td3_{model_episode}_critic_q1.pth"))
+    #Load Critic Q1
+    agent.critic_q1.load_state_dict(torch.load("../models/td3_ep_5000_no_noise_critic_q1.pth"))
     agent.critic_q1.eval()
-    # Load Critic Q2
-    agent.critic_q2.load_state_dict(torch.load(f"../models/{folder}/{folder}_td3_{model_episode}_critic_q2.pth"))
+    #Load Critic Q2
+    agent.critic_q2.load_state_dict(torch.load("../models/td3_ep_5000_no_noise_critic_q2.pth"))
     agent.critic_q2.eval()
 
-    for episode in range(1, episodes_test+1):
+    mode        = f"Testing {style}"
+    rewards     = []
+    episodes_test = 100
 
-        # Track shape passed in as variable and track information stored in environment, and returns marker postions
-        trackSegmentList = track
-        markers_x, markers_y = env.SetTrackSegmentList(trackSegmentList, noise)
-        seg1Id = trackSegmentList[0]
-        seg2Id = trackSegmentList[1]
+    state = env.reset()
+    state = np.array(state)
+    episode_reward = 0
+ 
 
-        state = env.reset()
-        state = np.array(state)
-        episode_reward = 0
-        sum_error = 0
+    for step in range(1, horizont+1):
 
-        # Arrays to store robot position at each time step to write to path.txt file
-        robot_x = []
-        robot_y = []
+        action = agent.get_action_from_policy(state)
+        next_state,reward,done,x, y, error, completion= env.step(action)
+        next_state = np.array(next_state)
+        episode_reward += reward
+        state = next_state
+        
 
-        for step in range(1, steps+1):
+        if done or step == horizont:
+            break
 
-            action = agent.get_action_from_policy(state)
-            next_state,reward,done,x, y, error, completion= env.step(action)
-            next_state = np.array(next_state)
-            episode_reward += reward
-            state = next_state
-            sum_error += error
-            print(f"-------Episode:{episode} Step:{step} Action:{action[0]} Completion:{round(completion,1)}%---------")
-
-            robot_x.append(x)
-            robot_y.append(y)
-
-            if done or step == steps:
-                average_ep_error =  sum_error/step
-                # Write episode information to test.txt
-                WriteTestRewardsToFile(folder, episode_reward, average_ep_error, completion, seg1Id, seg2Id, step)
-
-                # Append marker postions, and robot positions at each step showing path taken for every PATH_POS_FREQ episodes to test_path.txt
-                file_object = open(f"../plots/{folder}/test_path.txt", "a")
-
-                file_object.write(f"Ep{episode} {seg1Id} {seg2Id} {step} {completion} {average_ep_error}\n")
-
-                for i in range(30*len(trackSegmentList)):
-                    file_object.write(f"{i+1} {markers_x[i]} {markers_y[i]}\n")
-
-                for pos in range(len(robot_x)):
-                    file_object.write(f"0 {robot_x[pos]} {robot_y[pos]}\n")
-
-                file_object.write(f"End Episode {episode}\n")
-
-                file_object.close()
-
-                break
-
-        print("Episode total reward:", episode_reward)
+    print("Episode total reward:", episode_reward)
+    rewards.append(episode_reward)
 
 
-# Funciton to append each training episodes information to rewards.txt
-def WriteEpisodeRewardToFile(folder, reward, avg_error, completion, seg1, seg2, steps):
-    reward_file = open(f"../plots/{folder}/rewards.txt", "a")
-    reward_file.write(f"{reward} {avg_error} {completion} {seg1} {seg2} {steps}\n")
-    reward_file.close()
-
-# Funciton to append each testing episodes information to test.txt
-def WriteTestRewardsToFile(folder, reward, avg_error, completion, seg1, seg2, steps):
-    reward_file = open(f"../plots/{folder}/test.txt", "a")
-    reward_file.write(f"{reward} {avg_error} {completion} {seg1} {seg2} {steps}\n")
-    reward_file.close()
-
-
-# USE THESE FUNCTIONS TO CALL TESTING AND TRAINING
-def train(num_exploration_episodes=EXPLORATION_EPISODES,num_training_episodes=EXPLORATION_EPISODES,steps=STEPS,folder=FOLDER,noise=False):
-    env   = TD3_Env()
+def main_run(style="MFRL"):
+    env   = TD3_Real_Env()
     agent = TD3_Agent(env)
-    style = "MFRL" # model free RL
-    run_exploration(env, num_exploration_episodes, steps, agent, noise)
-    run_training(env, num_training_episodes, steps, agent, style, folder, noise)
+    episode_horizont= STEPS
 
-def test(episodes,steps,folder,noise,track):
-    env   = TD3_Env()
-    agent = TD3_Agent(env)
-    style = "MFRL" # model free RL
-    run_testing(env, episodes, steps, agent, style, track, folder, noise)
+    run_testing(env, episode_horizont, agent, style)
 
 
+if __name__ == "__main__":
+    #model = "MBRL"
+    model = "MFRL" # model free RL
+    main_run(model)
 
 

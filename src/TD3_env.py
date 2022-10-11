@@ -1,5 +1,5 @@
 """
-Authors: Aakaash Salvaji, Harry Taylor
+Authors:  Aakaash Salvaji, Harry Taylor, David Valencia, Trevor Gee, Henry Williams
 The University of Auckland
 
 TD3 Environment
@@ -7,10 +7,10 @@ Task: Autonomous Control of a Turtlebot2 as a racecar
 """
 
 import random
-from sqlite3 import complete_statement #TODO: Do we need this?
-from turtle import position #TODO: Do we need this?
+from sqlite3 import complete_statement
+from turtle import position
 import numpy as np
-from torch import true_divide #TODO: Do we need this?
+from torch import true_divide
 import rospy
 import math
 from gym import spaces

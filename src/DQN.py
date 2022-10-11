@@ -1,5 +1,5 @@
 """
-Authors: Aakaash Salvaji, Harry Taylor
+Authors:  Aakaash Salvaji, Harry Taylor, David Valencia, Trevor Gee, Henry Williams
 The University of Auckland
 
 DQN Model
@@ -7,7 +7,7 @@ Task: Autonomous Control of a Turtlebot2 as a racecar
 NOTE: Run Training with specified FOLDER name then run testing using same FOLDER name
 """
 
-from re import L #TODO: Do we need this?
+from re import L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
