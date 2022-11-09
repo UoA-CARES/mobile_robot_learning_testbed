@@ -23,7 +23,7 @@ from cmath import inf
 
 # Speeds for turtlebot
 MAX_TURN_SPEED = 0.4 # rad/s
-MAX_LINEAR_SPEED = 0.5 # m/s
+MAX_LINEAR_SPEED = 1 # m/s
 
 ACTION_RATE = 5 # number of actions/sec
 
@@ -120,7 +120,7 @@ class TD3_Env():
     # Gets random action
     def generate_sample_act(self):
         # Get random value between -1 and 1 (normalised)
-        return np.array([np.clip(random.uniform(-1,1), -1, 1)])
+        return np.array([np.clip(random.uniform(-1,1), -1, 1), np.clip(random.uniform(-1,1), -1, 1)])
 
     # Reset track and robot
     def reset(self):
@@ -187,11 +187,13 @@ class TD3_Env():
         return True
 
     def step(self, action):
+        angular = action[0]
+        linear = action[1]
         move_cmd = Twist()
         done = False
         self.GetCurrentState()
         # Get reward for current state
-        self.current_reward = self.CalculateReward()
+        self.current_reward = self.CalculateReward() + 5*(linear+1.0) # adjusted reward (linear between -1 and 1, +1 makes between 0 and 2 multiply by 5 range 0 to 10, more speed more reward)
 
         # If 0 marker is detected (finish line), end episode
         if self.finish_line_detected == True:
@@ -211,9 +213,9 @@ class TD3_Env():
             self.CheckSegmentCrossed()
             
             # take normalised action (between -1 and 1) and multiply by MAX_TURN_SPEED to get rotational velocity between -MAX_TURN_SPEED and +MAX_TURN_SPEED rad/s
-            move_cmd.angular.z = action*MAX_TURN_SPEED
+            move_cmd.angular.z = angular*MAX_TURN_SPEED
             # Constant forward velocity
-            move_cmd.linear.x = MAX_LINEAR_SPEED # 0.5 m/s
+            move_cmd.linear.x = ((linear+1.0)/2)*MAX_LINEAR_SPEED # 0.5 m/s # adjust linear value to be between 0 and 1 then scale by max linear speed
             self.cmd_vel.publish(move_cmd)
 
         # If robot gets too close to a marker, end the episode to avoid collision/going off track

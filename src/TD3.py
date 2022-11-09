@@ -61,7 +61,7 @@ class TD3_Agent:
         self.hidden_size_actor  = [64, 64, 32]
 
         self.num_states  = 12
-        self.num_actions = 1
+        self.num_actions = 2
 
         # ------------- Initialization memory --------------------- #
         self.memory = MemoryClass(self.max_memory_size_env)
