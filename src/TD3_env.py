@@ -39,7 +39,7 @@ class ArucoPositionInfo():
 class TD3_Env():
 
     def __init__(self):
-        rospy.init_node('TD3_Env', anonymous=False)
+        #rospy.init_node('TD3_Env', anonymous=False)
 
         self.segmentList = []
         self.observation_space = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
