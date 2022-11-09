@@ -40,7 +40,7 @@ class ArucoPositionInfo():
 class TD3_Real_Env():
 
     def __init__(self):
-        rospy.init_node('TD3_Real_Env', anonymous=False)
+        #rospy.init_node('TD3_Real_Env', anonymous=False)
 
         self.observation_space = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
         self.action_space = spaces.Discrete(2)
